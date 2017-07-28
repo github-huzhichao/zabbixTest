@@ -1,0 +1,197 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "clusterResourcePrefix": {
+      "type": "string",
+      "metadata": {
+        "description": "集群资源名前缀。该值会成为集群中虚拟机的完全限定域名(FQDN)的前缀，因此需要取一个全局唯一值。"
+      }
+    },
+    "clusterUsername": {
+      "type": "string",
+      "metadata": {
+        "description": "集群虚拟机的用户名"
+      },
+      "defaultValue": "clusteruser"
+    },
+    "clusterPassword": {
+      "type": "securestring",
+      "metadata": {
+        "description": "集群虚拟机密码"
+      }
+    },
+    "clusterVmCount": {
+      "type": "int",
+      "metadata": {
+        "description": "集群虚拟机数量"
+      },
+      "defaultValue": 2,
+      "maxValue": 20
+    },
+    "monitorVmName": {
+      "type": "string",
+      "metadata": {
+        "description": "监控虚拟机名。该值会成为监控虚拟机的完全限定域名(FQDN)的一部分，因此需要取一个全局唯一值。"
+      }
+    },
+    "monitorVmDistro": {
+      "type": "string",
+      "metadata": {
+        "description": "监控虚拟机的发行版种类。"
+      },
+      "allowedValues": [
+        "Ubuntu",
+        "CentOS"
+      ],
+      "defaultValue": "Ubuntu"
+    },
+    "monitorVmUsername": {
+      "type": "string",
+      "metadata": {
+        "description": "监控虚拟机用户名"
+      },
+      "defaultValue": "monitoruser"
+    },
+    "monitorVmPassword": {
+      "type": "securestring",
+      "metadata": {
+        "description": "监控虚拟机密码"
+      }
+    },
+    "mysqlServerType": {
+      "type": "string",
+      "metadata": {
+        "description": "MySQL服务器类型。'existing'会使用指定实例,'Localhost'会在监控虚拟机上创建新的实例, 'Paas'会创建新的paas实例。"
+      },
+      "allowedValues": [
+        "Existing", "Localhost", "Paas"
+      ],
+      "defaultValue": "Paas"
+    },
+    "mysqlHost": {
+      "type": "string",
+      "metadata": {
+        "description": "监控服务后端MySQL服务器地址，仅当'mysqlServerType'为'existing'需要。"
+      },
+      "defaultValue": ""
+    },
+    "mysqlDbName": {
+      "type": "string",
+      "metadata": {
+        "description": "监控服务后端MySQL数据库名"
+      },
+      "defaultValue": "zabbixdb"
+    },
+    "mysqlUser": {
+      "type": "string",
+      "metadata": {
+        "description": "监控服务后端MySQL数据库用户名"
+      },
+      "defaultValue": "zabbixuser"
+    },
+    "mysqlPassword": {
+      "type": "securestring",
+      "metadata": {
+        "description": "监控服务后端MySQL数据库密码"
+      }
+    },
+    "_artifactsLocation": {
+      "type": "string",
+      "metadata": {
+        "description": "该模板附属资源的基地址"
+      },
+      "defaultValue": "https://raw.githubusercontent.com/anysys/zabbix-v2/master/blob/"
+    }
+  },
+  "variables": {
+    "subnetName": "default"
+  },
+  "resources": [
+    {
+      "apiVersion": "2015-01-01",
+      "name": "deployClusterNodes",
+      "type": "Microsoft.Resources/deployments",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[concat(parameters('_artifactsLocation'), '/nested/clusterNodes.json')]",
+          "contentVersion": "1.0.0.0"
+        },
+        "parameters": {
+          "resourcePrefix": {
+            "value": "[parameters('clusterResourcePrefix')]"
+          },
+          "adminUsername": {
+            "value": "[parameters('clusterUsername')]"
+          },
+          "adminPassword": {
+            "value": "[parameters('clusterPassword')]"
+          },
+          "vmCount": {
+            "value": "[parameters('clusterVmCount')]"
+          }
+        }
+      }
+    },
+    {
+      "apiVersion": "2015-01-01",
+      "name": "deployMonitoringSolution",
+      "type": "Microsoft.Resources/deployments",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[concat(parameters('_artifactsLocation'), '/nested/monitoringSolution.json')]",
+          "contentVersion": "1.0.0.0"
+        },
+        "parameters": {
+          "existingStorageAccountName": {
+            "value": "[reference('deployClusterNodes').outputs.storageAccountName.value]"
+          },
+          "existingVirtualNetworkName": {
+            "value": "[reference('deployClusterNodes').outputs.virtualNetworkName.value]"
+          },
+          "existingSubnetName": {
+            "value": "[variables('subnetName')]"
+          },
+          "monitorVmName": {
+            "value": "[parameters('monitorVmName')]"
+          },
+          "monitorVmDistro": {
+            "value": "[parameters('monitorVmDistro')]"
+          },
+          "monitorVmUsername": {
+            "value": "[parameters('monitorVmUsername')]"
+          },
+          "monitorVmPassword": {
+            "value": "[parameters('monitorVmPassword')]"
+          },
+          "mysqlServerType": {
+            "value": "[parameters('mysqlServerType')]"
+          },
+          "mysqlHost": {
+            "value": "[parameters('mysqlHost')]"
+          },
+          "mysqlDbName": {
+            "value": "[parameters('mysqlDbName')]"
+          },
+          "mysqlUser": {
+            "value": "[parameters('mysqlUser')]"
+          },
+          "mysqlPassword": {
+            "value": "[parameters('mysqlPassword')]"
+          },
+          "_artifactsLocation": {
+            "value": "[parameters('_artifactsLocation')]"
+          }
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "serverPublicEndpoint": {
+      "type": "string",
+      "value": "[reference('deployMonitoringSolution').outputs.serverPublicEndpoint.value]"
+    }
+  }
+}
